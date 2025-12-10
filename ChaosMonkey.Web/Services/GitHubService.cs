@@ -15,15 +15,15 @@ public class GitHubService
         _logger = logger;
         
         var token = _configuration["GitHub:Token"];
-        // if (string.IsNullOrWhiteSpace(token))
-        // {
-        //     throw new InvalidOperationException("GitHub token is required. Set GitHub:Token in configuration.");
-        // }
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new InvalidOperationException("GitHub token is required. Set GitHub:Token in configuration.");
+        }
 
-        // _client = new GitHubClient(new ProductHeaderValue("chaos-monkey"))
-        // {
-        //     Credentials = new Credentials(token)
-        // };
+        _client = new GitHubClient(new ProductHeaderValue("chaos-monkey"))
+        {
+            Credentials = new Credentials(token)
+        };
     }
 
     public async Task<string?> CreateChaosIssueAsync(TiltifyDonationData donation)
@@ -33,21 +33,32 @@ public class GitHubService
             var owner = _configuration["GitHub:Owner"] ?? throw new InvalidOperationException("GitHub:Owner is required");
             var repo = _configuration["GitHub:Repository"] ?? throw new InvalidOperationException("GitHub:Repository is required");
 
+						_logger.LogInformation("Creating GitHub issue in {Owner}/{Repo} for donation {DonationId}", owner, repo, donation?.Id ?? "null");
+
             var title = ChaosMapper.GenerateIssueTitle(donation);
+
             var body = ChaosMapper.GenerateIssueBody(donation);
 
-            var newIssue = new NewIssue(title)
+						var newIssue = null as NewIssue;
+						try {
+            newIssue = new NewIssue(title)
             {
                 Body = body
             };
+						}catch (Exception ex) {
+							_logger.LogError(ex, "Error creating NewIssue object for donation {DonationId}", donation.Id);
+							throw;
+						}
+
             
             newIssue.Labels.Add("chaos");
             newIssue.Labels.Add("donation");
 
+
             var issue = await _client.Issue.Create(owner, repo, newIssue);
-            
+
             _logger.LogInformation("Created GitHub issue #{IssueNumber} for donation {DonationId} from {DonorName}", 
-                issue.Number, donation.Id, donation.Donor_Name);
+                issue?.Number ?? 0, donation.Id, donation.Donor_Name);
 
             return issue.HtmlUrl;
         }

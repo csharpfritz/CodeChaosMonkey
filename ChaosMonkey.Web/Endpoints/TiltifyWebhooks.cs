@@ -40,9 +40,14 @@ public static class TiltifyWebhooks
                 return Results.Ok(new WebhookResponse(true, $"Ignored webhook type: {payload.Meta.Event_Type}"));
             }
 
-            return Results.Ok();
+						decimal donationAmountValue = payload.Data.Amount.Value != "" ? decimal.Parse(payload.Data.Amount.Value) : 0m;
+						// if (donationAmountValue != 5.0m) {
+						// 	logger.LogInformation("Ignoring donation amount: {DonationAmount}", donationAmountValue);
+						// 	return Results.Ok(new WebhookResponse(true, $"Ignored donation amount: {donationAmountValue}"));
+						// }
 
             // Create GitHub issue for the chaos request
+						logger.LogInformation($"Payload: {System.Text.Json.JsonSerializer.Serialize(payload.Data)}");
             var issueUrl = await gitHubService.CreateChaosIssueAsync(payload.Data);
 
             if (issueUrl != null)
