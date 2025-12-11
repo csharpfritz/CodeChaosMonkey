@@ -1,6 +1,8 @@
 using ChaosMonkey.Web.Models;
 using ChaosMonkey.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace ChaosMonkey.Web.Endpoints;
 
@@ -18,6 +20,7 @@ public static class TiltifyWebhooks
     }
 
     private static async Task<IResult> HandleTiltifyWebhook(
+        HttpContext httpContext,
         [FromBody] TiltifyWebhookPayload payload,
         [FromServices] IConfiguration configuration,
         GitHubService gitHubService,
@@ -25,6 +28,16 @@ public static class TiltifyWebhooks
     {
         try
         {
+            // Verify webhook signature
+            if (!await VerifyTiltifySignature(httpContext, configuration, logger))
+            {
+                logger.LogWarning("Invalid Tiltify webhook signature");
+                return Results.Json(
+                    new WebhookResponse(false, "Invalid signature"),
+                    statusCode: 401
+                );
+            }
+
             logger.LogInformation("Received Tiltify webhook: {EventType} for donation {DonationId}",
                 payload.Meta.Event_Type, payload.Data.Id);
 
@@ -83,5 +96,56 @@ public static class TiltifyWebhooks
                 statusCode: 500
             );
         }
+    }
+
+    private static async Task<bool> VerifyTiltifySignature(
+        HttpContext context,
+        IConfiguration configuration,
+        ILogger logger)
+    {
+        var webhookSecret = configuration["Tiltify:WebhookSecret"];
+        
+        // Allow skipping signature verification in development
+        if (string.IsNullOrWhiteSpace(webhookSecret))
+        {
+            logger.LogWarning("Tiltify:WebhookSecret not configured - skipping signature verification (NOT SECURE!)");
+            return true;
+        }
+
+        // Get the signature from headers
+        if (!context.Request.Headers.TryGetValue("X-Tiltify-Signature", out var signatureHeader))
+        {
+            logger.LogWarning("Missing X-Tiltify-Signature header");
+            return false;
+        }
+
+        var receivedSignature = signatureHeader.ToString();
+        
+        // Read the raw body for signature verification
+        context.Request.EnableBuffering();
+        context.Request.Body.Position = 0;
+        
+        using var reader = new StreamReader(context.Request.Body, Encoding.UTF8, leaveOpen: true);
+        var rawBody = await reader.ReadToEndAsync();
+        context.Request.Body.Position = 0;
+
+        // Compute HMAC-SHA256 signature
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(webhookSecret));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawBody));
+        var computedSignature = Convert.ToHexString(hash).ToLowerInvariant();
+
+        // Compare signatures (constant time comparison to prevent timing attacks)
+        var isValid = CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(receivedSignature),
+            Encoding.UTF8.GetBytes(computedSignature)
+        );
+
+        if (!isValid)
+        {
+            logger.LogWarning("Signature mismatch. Received: {Received}, Computed: {Computed}",
+                receivedSignature, computedSignature);
+        }
+
+        return isValid;
     }
 }

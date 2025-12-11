@@ -47,18 +47,21 @@ public class ChaosMapper
         var amount = decimal.Parse(donation.Amount.Value);
         var instruction = MapToInstruction(amount);
         
+        var chaosType = amount >= 5 ? "Complex" : "Simple";
+        
         var body = $"""
             ## Chaos Monkey Request 🐒
 
+            **Chaos Type:** {chaosType}
             **Chaos Level**: {donation.Amount.Currency} ${amount:F2}
             **Requested by**: {donation.Donor_Name}
-            **Instruction**: {instruction}
+            **Description:** {instruction}
             **Donation ID**: {donation.Id}
 
             ---
             
             This chaos request was automatically generated from a donation event.
-            Please apply the requested chaos mutation to the codebase.
+            The Chaos Executor service will process this task automatically.
             """;
 
         return body;

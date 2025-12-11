@@ -16,7 +16,7 @@ public record TiltifyDonationData(
     string? Email,
     string Fundraising_Event_Id,
     string Id,
-    int Legacy_Id,
+    int Legacy_Id, 
     string? Poll_Id,
     string? Poll_Option_Id,
     string? Reward_Custom_Question,
