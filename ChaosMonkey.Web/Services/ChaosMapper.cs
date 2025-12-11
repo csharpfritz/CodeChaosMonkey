@@ -4,23 +4,34 @@ namespace ChaosMonkey.Web.Services;
 
 public class ChaosMapper
 {
+    static readonly List<string> instructions = new List<string> {
+        "Rename a test to something ridiculous",
+        "Insert goofy placeholder test",
+        "Introduce a random sleep in a unit test",
+        "Change a variable name to a funny word",
+        "Make something nullable that shouldn't be",
+        "Change a method name to a pun",
+    };
+
+    static readonly List<string> SimpleInstructions = new List<string> {
+        "Add silly log line to unit test",
+        "Add a comment with a joke in the code",
+        "Introduce a log statement with a meme reference",
+    };
+
+    private static readonly DateTime FirstDate = new DateTime(2025, 12, 10);
+
     public static string MapToInstruction(decimal amount)
     {
 
-			var random = new Random();
-			var instructions = new List<string> {
-				"Add silly log line to unit test",
-				"Rename a test to something ridiculous",
-				"Insert goofy placeholder test",
-				"Introduce a random sleep in a unit test",
-				"Change a variable name to a funny word",
-				"Add a comment with a joke in the code",
-				"Make something nullable that shouldn't be",
-				"Introduce a log statement with a meme reference",
-				"Change a method name to a pun",
-			};
+        var random = new Random((int)(DateTime.Now - FirstDate).TotalSeconds);
 
-			return instructions[random.Next(instructions.Count)];
+        if (amount < 5)
+        {
+            return SimpleInstructions[random.Next(SimpleInstructions.Count)];
+        }
+
+        return instructions[random.Next(instructions.Count)];
 
     }
 

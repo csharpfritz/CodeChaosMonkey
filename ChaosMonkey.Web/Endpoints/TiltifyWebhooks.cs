@@ -19,18 +19,19 @@ public static class TiltifyWebhooks
 
     private static async Task<IResult> HandleTiltifyWebhook(
         [FromBody] TiltifyWebhookPayload payload,
+        [FromServices] IConfiguration configuration,
         GitHubService gitHubService,
         ILogger<Program> logger)
     {
         try
         {
-            logger.LogInformation("Received Tiltify webhook: {EventType} for donation {DonationId}", 
+            logger.LogInformation("Received Tiltify webhook: {EventType} for donation {DonationId}",
                 payload.Meta.Event_Type, payload.Data.Id);
 
             // Log donation details including custom questions
             var donationAmount = decimal.Parse(payload.Data.Amount.Value);
-            logger.LogInformation("Donation Details: Amount: {Currency} ${Amount}, Donor: {DonorName}, Custom Question: {CustomQuestion}", 
-                payload.Data.Amount.Currency, donationAmount, payload.Data.Donor_Name, 
+            logger.LogInformation("Donation Details: Amount: {Currency} ${Amount}, Donor: {DonorName}, Custom Question: {CustomQuestion}",
+                payload.Data.Amount.Currency, donationAmount, payload.Data.Donor_Name,
                 payload.Data.Reward_Custom_Question ?? "None");
 
             // Only process donation events
@@ -40,26 +41,27 @@ public static class TiltifyWebhooks
                 return Results.Ok(new WebhookResponse(true, $"Ignored webhook type: {payload.Meta.Event_Type}"));
             }
 
-						decimal donationAmountValue = payload.Data.Amount.Value != "" ? decimal.Parse(payload.Data.Amount.Value) : 0m;
-						// if (donationAmountValue != 5.0m) {
-						// 	logger.LogInformation("Ignoring donation amount: {DonationAmount}", donationAmountValue);
-						// 	return Results.Ok(new WebhookResponse(true, $"Ignored donation amount: {donationAmountValue}"));
-						// }
+            decimal donationAmountValue = payload.Data.Amount.Value != "" ? decimal.Parse(payload.Data.Amount.Value) : 0m;
+            var minimulDonationThreshold = configuration.GetValue<decimal>("ChaosMonkey:MinimulDonationThreshold", 5.0m);
+            if (donationAmountValue <= minimulDonationThreshold) {
+            	logger.LogInformation("Ignoring donation amount: {DonationAmount}", donationAmountValue);
+            	return Results.Ok(new WebhookResponse(true, $"Ignored donation amount: {donationAmountValue}"));
+            }
 
             // Create GitHub issue for the chaos request
-						logger.LogInformation($"Payload: {System.Text.Json.JsonSerializer.Serialize(payload.Data)}");
+            logger.LogInformation($"Payload: {System.Text.Json.JsonSerializer.Serialize(payload.Data)}");
             var issueUrl = await gitHubService.CreateChaosIssueAsync(payload.Data);
 
             if (issueUrl != null)
             {
                 var response = new WebhookResponse(
-                    true, 
-                    "Successfully created chaos issue", 
+                    true,
+                    "Successfully created chaos issue",
                     issueUrl
                 );
 
                 var amount = decimal.Parse(payload.Data.Amount.Value);
-                logger.LogInformation("Successfully processed donation {DonationId} from {DonorName} ({Currency} ${Amount})", 
+                logger.LogInformation("Successfully processed donation {DonationId} from {DonorName} ({Currency} ${Amount})",
                     payload.Data.Id, payload.Data.Donor_Name, payload.Data.Amount.Currency, amount);
 
                 return Results.Ok(response);
@@ -68,7 +70,7 @@ public static class TiltifyWebhooks
             {
                 logger.LogWarning("Failed to create GitHub issue for donation {DonationId}", payload.Data.Id);
                 return Results.Json(
-                    new WebhookResponse(false, "Failed to create GitHub issue"), 
+                    new WebhookResponse(false, "Failed to create GitHub issue"),
                     statusCode: 500
                 );
             }
@@ -77,7 +79,7 @@ public static class TiltifyWebhooks
         {
             logger.LogError(ex, "Error processing Tiltify webhook");
             return Results.Json(
-                new WebhookResponse(false, "Internal server error"), 
+                new WebhookResponse(false, "Internal server error"),
                 statusCode: 500
             );
         }
