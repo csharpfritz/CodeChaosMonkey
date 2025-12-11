@@ -1,7 +1,11 @@
 ---
 name: chaos-monkey
 description: Chaos Monkey agent that introduces controlled, entertaining code mutations for St. Jude fundraiser live streams. Applies humorous sabotage based on viewer donations while keeping code functional.
-tools: ["search", "edit"]
+permissions:
+  allow:
+    tools:
+      - search
+      - edit
 ---
 
 # Chaos Monkey Agent 🐒

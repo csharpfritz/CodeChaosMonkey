@@ -7,6 +7,8 @@ builder.AddServiceDefaults();
 
 // Add services
 builder.Services.AddSingleton<GitHubService>();
+builder.Services.AddSingleton<ChaosCommandExecutor>();
+builder.Services.AddHostedService<ChaosExecutorService>();
 
 var app = builder.Build();
 

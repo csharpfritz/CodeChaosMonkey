@@ -9,6 +9,7 @@ var web = builder.AddProject<Projects.ChaosMonkey_Web>("web")
 	.WithEnvironment("GitHub:Owner", ghUser)
 	.WithEnvironment("GitHub:Repository", ghRepo)
 	.WithEnvironment("GitHub:Token", ghToken)
+	.WithEnvironment("ChaosMonkey:MinimumDonationThreshold", "Parameters:ChaosMonkey:MinimumDonationThreshold")
 	.WithExternalHttpEndpoints();
 
 

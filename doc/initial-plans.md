@@ -60,9 +60,7 @@ Maps donation tiers to chaos actions.
 public static string Map(decimal amount)
 {
     if (amount == 5) return "Add silly log line to unit test.";
-    if (amount == 20) return "Rename a test to something ridiculous.";
-    if (amount == 50) return "Insert goofy placeholder test.";
-    if (amount >= 100) return "Introduce runtime chaos (exceptions, sleeps).";
+    if (amount < 5) return "Simple chaos mutation.";
     return "General chaos mutation.";
 }
 

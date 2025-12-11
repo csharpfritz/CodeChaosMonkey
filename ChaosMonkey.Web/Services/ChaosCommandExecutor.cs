@@ -1,0 +1,221 @@
+using Octokit;
+using System.Diagnostics;
+using System.Text;
+
+namespace ChaosMonkey.Web.Services;
+
+public class ChaosCommandExecutor
+{
+	private readonly IConfiguration _configuration;
+	private readonly ILogger<ChaosCommandExecutor> _logger;
+
+	public ChaosCommandExecutor(IConfiguration configuration, ILogger<ChaosCommandExecutor> logger)
+	{
+		_configuration = configuration;
+		_logger = logger;
+	}
+
+	public async Task<ChaosExecutionResult> ExecuteChaosTaskAsync(Issue issue)
+	{
+		try
+		{
+			// Parse the chaos task from the issue body
+			var chaosTask = ParseChaosTask(issue);
+
+			if (chaosTask == null)
+			{
+				return ChaosExecutionResult.Failed("Could not parse chaos task from issue body");
+			}
+
+			_logger.LogInformation("Executing chaos task: {Task}", chaosTask.Description);
+
+			// Execute the command based on the task type
+			var result = await ExecuteCommandAsync(chaosTask);
+
+			return result;
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to execute chaos task for issue #{Number}", issue.Number);
+			return ChaosExecutionResult.Failed(ex.Message);
+		}
+	}
+
+	private ChaosTask? ParseChaosTask(Issue issue)
+	{
+		// Parse the issue body to extract the chaos task details
+		// Expected format in issue body:
+		// Chaos Type: [type]
+		// Description: [description]
+		// Command: [command]
+
+		// log the body for debugging
+		_logger.LogInformation("Parsing issue body:\n{Body}", issue.Body);
+
+		var lines = issue.Body?.Split('\n') ?? Array.Empty<string>();
+
+		string? chaosType = null;
+		string? description = null;
+		string? command = null;
+		string requestedBy = "";
+
+		foreach (var line in lines)
+		{
+			var trimmed = line.Trim();
+			if (trimmed.StartsWith("**Instruction**:"))
+			{
+				description = trimmed.Replace("**Instruction**:", "").Trim();
+			}
+			else if (trimmed.StartsWith("**Description:**"))
+			{
+				description = trimmed.Replace("**Description:**", "").Trim();
+			}
+			else if (trimmed.StartsWith("**Requested by**:"))
+			{
+				requestedBy = trimmed.Replace("**Requested by**:", "").Trim();
+			}
+		}
+
+		if (string.IsNullOrWhiteSpace(description))
+		{
+			return null;
+		}
+
+		return new ChaosTask
+		{
+			Type = chaosType ?? "Unknown",
+			Description = description,
+			RequestedBy = requestedBy // You can extract this from the issue body if needed
+		};
+	}
+
+	private async Task<ChaosExecutionResult> ExecuteCommandAsync(ChaosTask task)
+	{
+		// Get the repository path from configuration
+		var repoPath = _configuration["ChaosMonkey:RepositoryPath"];
+
+		if (string.IsNullOrWhiteSpace(repoPath) || !Directory.Exists(repoPath))
+		{
+			return ChaosExecutionResult.Failed($"Repository path not configured or does not exist: {repoPath}");
+		}
+
+		// If a specific command is provided, execute it
+		// if (!string.IsNullOrWhiteSpace(task.Command))
+		// {
+		// 	return await ExecutePowerShellCommandAsync(task.Command, repoPath);
+		// }
+
+		// Otherwise, use gh copilot CLI to suggest and execute
+		return await ExecuteWithCopilotCLIAsync(task, repoPath);
+	}
+
+	private async Task<ChaosExecutionResult> ExecutePowerShellCommandAsync(string command, string workingDirectory)
+	{
+		try
+		{
+			var processInfo = new ProcessStartInfo
+			{
+				FileName = "pwsh",
+				Arguments = $"-Command \"{command}\"",
+				WorkingDirectory = workingDirectory,
+				RedirectStandardOutput = true,
+				RedirectStandardError = true,
+				UseShellExecute = false,
+				CreateNoWindow = true
+			};
+
+			// log the command being executed
+			_logger.LogInformation("Executing PowerShell command: {Command} in {WorkingDirectory}", command, workingDirectory);
+
+			using var process = Process.Start(processInfo);
+			if (process == null)
+			{
+				return ChaosExecutionResult.Failed("Failed to start PowerShell process");
+			}
+
+			var output = await process.StandardOutput.ReadToEndAsync();
+			var error = await process.StandardError.ReadToEndAsync();
+
+			await process.WaitForExitAsync();
+
+			if (process.ExitCode != 0)
+			{
+				_logger.LogError("Powershell output: {Output}", output);
+				_logger.LogError("Powershell error: {Error}", error);
+				return ChaosExecutionResult.Failed($"Command failed with exit code {process.ExitCode}\n{error}");
+			}
+
+			return ChaosExecutionResult.Succeeded(output);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to execute PowerShell command: {Command}", command);
+			return ChaosExecutionResult.Failed(ex.Message);
+		}
+	}
+
+	private async Task<ChaosExecutionResult> ExecuteWithCopilotCLIAsync(ChaosTask task, string workingDirectory)
+	{
+		try
+		{
+			// Use the new copilot CLI in programmatic mode with automatic approval for shell commands
+			// Note: Using --allow-tool 'shell' allows Copilot to execute shell commands
+			// For safety in production, you may want to use more restrictive options
+			var promptCommand = $"copilot -p \"{task.Command}\" --agent chaos-monkey --allow-all-paths --allow-all-tools -s";
+
+			_logger.LogInformation("Invoking Copilot CLI for: {Description}", task.Description);
+
+			var result = await ExecutePowerShellCommandAsync(promptCommand, workingDirectory);
+
+			if (!result.Success)
+			{
+				return ChaosExecutionResult.Failed($"Failed to execute with Copilot CLI: {result.Error}");
+			}
+
+			_logger.LogInformation("Copilot CLI completed task: {Description}", task.Description);
+
+			return ChaosExecutionResult.Succeeded(result.Output);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to execute with Copilot CLI");
+			return ChaosExecutionResult.Failed(ex.Message);
+		}
+	}
+}
+
+public class ChaosTask
+{
+	public string Type { get; set; } = string.Empty;
+	public string Description { get; set; } = string.Empty;
+	public string? Command => $"""
+		**Command:** {Description}  This command was auto-generated based on the chaos task description for a donation from {RequestedBy}.  Please apply the requested chaos changes responsibly!
+	""";
+
+	public string RequestedBy { get; set; } = string.Empty;
+}
+
+public class ChaosExecutionResult
+{
+	public bool Success { get; set; }
+	public string? Output { get; set; }
+	public string? Error { get; set; }
+
+	public static ChaosExecutionResult Succeeded(string? output = null)
+	{
+		return new ChaosExecutionResult
+		{
+			Success = true,
+			Output = output
+		};
+	}
+
+	public static ChaosExecutionResult Failed(string? error = null)
+	{
+		return new ChaosExecutionResult
+		{
+			Success = false,
+			Error = error
+		};
+	}
+}
