@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppHost", "AppHost\AppHost.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceDefaults", "ServiceDefaults\ServiceDefaults.csproj", "{2AC32F18-C065-48E6-8C02-7367364620C8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChaosMonkey.Web.Tests", "ChaosMonkey.Web.Tests\ChaosMonkey.Web.Tests.csproj", "{19F4D801-FC79-4387-9913-32F60A6031FF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{2AC32F18-C065-48E6-8C02-7367364620C8}.Release|x64.Build.0 = Release|Any CPU
 		{2AC32F18-C065-48E6-8C02-7367364620C8}.Release|x86.ActiveCfg = Release|Any CPU
 		{2AC32F18-C065-48E6-8C02-7367364620C8}.Release|x86.Build.0 = Release|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Debug|x64.Build.0 = Debug|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Debug|x86.Build.0 = Debug|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Release|x64.ActiveCfg = Release|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Release|x64.Build.0 = Release|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Release|x86.ActiveCfg = Release|Any CPU
+		{19F4D801-FC79-4387-9913-32F60A6031FF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
