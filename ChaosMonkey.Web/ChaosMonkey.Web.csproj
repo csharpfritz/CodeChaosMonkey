@@ -15,4 +15,8 @@
     <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
 
+  <!-- 🐒 Chaos Monkey: exclude goofy placeholder test from compilation so it remains harmless -->
+  <ItemGroup>
+    <None Include="GoofyPlaceholderTests.cs" />
+  </ItemGroup>
 </Project>

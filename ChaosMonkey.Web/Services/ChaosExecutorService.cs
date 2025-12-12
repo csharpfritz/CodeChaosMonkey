@@ -1,4 +1,6 @@
 using ChaosMonkey.Web.Models;
+using ChaosMonkey.Web.Hubs;
+using Microsoft.AspNetCore.SignalR;
 
 namespace ChaosMonkey.Web.Services;
 
@@ -7,16 +9,19 @@ public class ChaosExecutorService : BackgroundService
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILogger<ChaosExecutorService> _logger;
 	private readonly IConfiguration _configuration;
+	private readonly IHubContext<ChaosStatusHub> _hubContext;
 	private readonly TimeSpan _pollInterval;
 
 	public ChaosExecutorService(
 		IServiceProvider serviceProvider,
 		ILogger<ChaosExecutorService> logger,
-		IConfiguration configuration)
+		IConfiguration configuration,
+		IHubContext<ChaosStatusHub> hubContext)
 	{
 		_serviceProvider = serviceProvider;
 		_logger = logger;
 		_configuration = configuration;
+		_hubContext = hubContext;
 		
 		// Default to checking every 30 seconds, configurable via appsettings
 		var intervalSeconds = _configuration.GetValue<int>("ChaosMonkey:PollIntervalSeconds", 30);
@@ -76,6 +81,9 @@ public class ChaosExecutorService : BackgroundService
 				// Mark issue as being processed (add a label or comment)
 				await githubService.MarkIssueAsProcessingAsync(issue.Number);
 
+				// Notify overlay that chaos is starting
+				await _hubContext.Clients.All.SendAsync("ChaosStarted", issue.Number, issue.Title, cancellationToken);
+
 				// Execute the chaos command
 				var result = await commandExecutor.ExecuteChaosTaskAsync(issue);
 
@@ -83,18 +91,21 @@ public class ChaosExecutorService : BackgroundService
 				{
 					_logger.LogInformation("Successfully executed chaos task for issue #{Number}", issue.Number);
 					await githubService.MarkIssueAsCompletedAsync(issue.Number, result.Output);
+					await _hubContext.Clients.All.SendAsync("ChaosCompleted", issue.Number, true, cancellationToken);
 				}
 				else
 				{
 					_logger.LogError("Failed to execute chaos task for issue #{Number}: {Error}", 
 						issue.Number, result.Error);
 					await githubService.MarkIssueAsFailedAsync(issue.Number, result.Error);
+					await _hubContext.Clients.All.SendAsync("ChaosCompleted", issue.Number, false, cancellationToken);
 				}
 			}
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "Error processing chaos issue #{Number}", issue.Number);
 				await githubService.MarkIssueAsFailedAsync(issue.Number, ex.Message);
+				await _hubContext.Clients.All.SendAsync("ChaosCompleted", issue.Number, false, cancellationToken);
 			}
 		}
 	}
