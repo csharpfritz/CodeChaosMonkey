@@ -55,8 +55,8 @@ public static class TiltifyWebhooks
             }
 
             decimal donationAmountValue = payload.Data.Amount.Value != "" ? decimal.Parse(payload.Data.Amount.Value) : 0m;
-            var minimulDonationThreshold = configuration.GetValue<decimal>("ChaosMonkey:MinimulDonationThreshold", 5.0m);
-            if (donationAmountValue <= minimulDonationThreshold) {
+            var minimumDonationValue = configuration.GetValue<decimal>("ChaosMonkey:MinimumDonationThreshold", 5.0m);
+            if (donationAmountValue > minimumDonationValue || donationAmountValue < 1.0m) {
             	logger.LogInformation("Ignoring donation amount: {DonationAmount}", donationAmountValue);
             	return Results.Ok(new WebhookResponse(true, $"Ignored donation amount: {donationAmountValue}"));
             }
