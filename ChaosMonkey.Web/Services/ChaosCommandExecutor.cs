@@ -115,8 +115,8 @@ public class ChaosCommandExecutor
 		{
 			var processInfo = new ProcessStartInfo
 			{
-				FileName = "pwsh",
-				Arguments = $"-Command \"{command}\"",
+				FileName = "copilot",
+				Arguments = command,
 				WorkingDirectory = workingDirectory,
 				RedirectStandardOutput = true,
 				RedirectStandardError = true,
@@ -161,7 +161,7 @@ public class ChaosCommandExecutor
 			// Use the new copilot CLI in programmatic mode with automatic approval for shell commands
 			// Note: Using --allow-tool 'shell' allows Copilot to execute shell commands
 			// For safety in production, you may want to use more restrictive options
-			var promptCommand = $"copilot -p \"{task.Command}\" --agent chaos-monkey --allow-all-paths --allow-all-tools -s";
+			var promptCommand = $"-p \"{task.Command}\" --agent chaos-monkey --allow-all-paths --allow-all-tools -s";
 
 			_logger.LogInformation("Invoking Copilot CLI for: {Description}", task.Description);
 
