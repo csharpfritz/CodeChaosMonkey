@@ -1,11 +1,13 @@
 using ChaosMonkey.Web.Endpoints;
 using ChaosMonkey.Web.Services;
+using ChaosMonkey.Web.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
 // Add services
+builder.Services.AddSignalR();
 builder.Services.AddSingleton<GitHubService>();
 builder.Services.AddSingleton<ChaosCommandExecutor>();
 builder.Services.AddHostedService<ChaosExecutorService>();
@@ -16,8 +18,14 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 
+// Serve static files for the overlay
+app.UseStaticFiles();
+
 // Map webhook endpoints
 app.MapTiltifyEndpoints();
+
+// Map SignalR hub
+app.MapHub<ChaosStatusHub>("/hubs/chaos");
 
 app.MapDefaultEndpoints();
 

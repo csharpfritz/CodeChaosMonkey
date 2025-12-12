@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaos Monkey Overlay</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #overlay {
+            position: fixed;
+            bottom: 250px;
+            right: 20px;
+            width: 400px;
+            height: 350px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 15px;
+            border: 3px solid #ff4444;
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.5);
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        #overlay.active {
+            display: flex;
+        }
+
+        .monkey-container {
+            text-align: center;
+            animation: bounceIn 0.5s ease-out;
+        }
+
+        .monkey {
+            font-size: 100px;
+            animation: bounce 1s ease-in-out infinite;
+            filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.5));
+        }
+
+        .chaos-text {
+            color: #ff4444;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            animation: pulse 1.5s ease-in-out infinite;
+            text-shadow: 0 0 10px #ff4444, 0 0 20px #ff4444;
+        }
+
+        .issue-info {
+            color: #ffffff;
+            font-size: 14px;
+            margin-top: 10px;
+            animation: slideUp 0.5s ease-out;
+            padding: 0 10px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
+
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .status.connected {
+            background: rgba(0, 255, 0, 0.2);
+        }
+
+        .status.disconnected {
+            background: rgba(255, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="overlay">
+        <div class="monkey-container">
+            <div class="monkey">🐵</div>
+            <div class="chaos-text">CHAOS ENGAGED!</div>
+            <div class="issue-info" id="issueInfo"></div>
+        </div>
+    </div>
+
+    <div class="status" id="status">Connecting...</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
+    <script>
+        const overlay = document.getElementById('overlay');
+        const issueInfo = document.getElementById('issueInfo');
+        const status = document.getElementById('status');
+
+        // Connect to SignalR hub
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/hubs/chaos")
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("ChaosStarted", (issueNumber, issueTitle) => {
+            console.log(`Chaos started: #${issueNumber} - ${issueTitle}`);
+            issueInfo.textContent = `Issue #${issueNumber}: ${issueTitle}`;
+            overlay.classList.add('active');
+        });
+
+        connection.on("ChaosCompleted", (issueNumber, success) => {
+            console.log(`Chaos completed: #${issueNumber} - Success: ${success}`);
+            setTimeout(() => {
+                overlay.classList.remove('active');
+                issueInfo.textContent = '';
+            }, 2000); // Keep overlay for 2 seconds after completion
+        });
+
+        connection.onreconnecting(() => {
+            status.textContent = 'Reconnecting...';
+            status.className = 'status disconnected';
+        });
+
+        connection.onreconnected(() => {
+            status.textContent = 'Connected';
+            status.className = 'status connected';
+        });
+
+        connection.onclose(() => {
+            status.textContent = 'Disconnected';
+            status.className = 'status disconnected';
+        });
+
+        async function start() {
+            try {
+                await connection.start();
+                console.log("SignalR Connected");
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+            } catch (err) {
+                console.error("SignalR Connection Error: ", err);
+                status.textContent = 'Connection Failed';
+                status.className = 'status disconnected';
+                setTimeout(start, 5000);
+            }
+        }
+
+        start();
+    </script>
+</body>
+</html>
