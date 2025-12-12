@@ -8,6 +8,7 @@ namespace ChaosMonkey.Web.Endpoints;
 
 public static class TiltifyWebhooks
 {
+    // 🐒 Chaos Monkey: renamed to a pun 'MapTiltifyEndpuns' for streaming fun (Donor: elliface, DonationID: N/A)
     public static void MapTiltifyEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/webhooks/tiltify", HandleTiltifyWebhook)
@@ -54,12 +55,12 @@ public static class TiltifyWebhooks
                 return Results.Ok(new WebhookResponse(true, $"Ignored webhook type: {payload.Meta.Event_Type}"));
             }
 
-            decimal donationAmountValue = payload.Data.Amount.Value != "" ? decimal.Parse(payload.Data.Amount.Value) : 0m;
-            var minimumDonationValue = configuration.GetValue<decimal>("ChaosMonkey:MinimumDonationThreshold", 5.0m);
-            if (donationAmountValue > minimumDonationValue || donationAmountValue < 1.0m) {
-            	logger.LogInformation("Ignoring donation amount: {DonationAmount}", donationAmountValue);
-            	return Results.Ok(new WebhookResponse(true, $"Ignored donation amount: {donationAmountValue}"));
-            }
+            // decimal donationAmountValue = payload.Data.Amount.Value != "" ? decimal.Parse(payload.Data.Amount.Value) : 0m;
+            // var minimumDonationValue = configuration.GetValue<decimal>("ChaosMonkey:MinimumDonationThreshold", 5.0m);
+            // // if (donationAmountValue > minimumDonationValue || donationAmountValue < 1.0m) {
+            // 	logger.LogInformation("Ignoring donation amount: {DonationAmount}", donationAmountValue);
+            // 	return Results.Ok(new WebhookResponse(true, $"Ignored donation amount: {donationAmountValue}"));
+            // }
 
             // Create GitHub issue for the chaos request
             logger.LogInformation($"Payload: {System.Text.Json.JsonSerializer.Serialize(payload.Data)}");
