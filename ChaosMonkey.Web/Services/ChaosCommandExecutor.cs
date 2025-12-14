@@ -9,6 +9,30 @@ public class ChaosCommandExecutor
 	private readonly IConfiguration _configuration;
 	private readonly ILogger<ChaosCommandExecutor> _logger;
 
+	// Chaos Monkey agent instructions embedded inline to avoid requiring agent files in destination repos
+	private const string ChaosMonkeyInstructions = @"
+You are the Chaos Monkey Agent for the St. Jude fundraiser. Your mission is to introduce controlled, entertaining chaos mutations to the codebase.
+
+## Implementation Guidelines
+
+### DO:
+- ✅ Keep mutations entertaining but harmless
+- ✅ Preserve existing functionality - code should still compile and work
+- ✅ Add clear comments explaining what chaos was applied (include 🐒 emoji)
+- ✅ Use appropriate humor suitable for live streaming and charity fundraising
+- ✅ Target test files primarily for safer mutations
+- ✅ Make changes obvious so streamers can easily spot them
+- ✅ Test that code compiles after changes
+
+### DON'T:
+- ❌ Break the build or cause compilation errors
+- ❌ Remove or break existing functionality
+- ❌ Use inappropriate language or offensive content
+- ❌ Modify critical production code paths
+- ❌ Change database connections or external API calls
+- ❌ Alter security-related code
+";
+
 	public ChaosCommandExecutor(IConfiguration configuration, ILogger<ChaosCommandExecutor> logger)
 	{
 		_configuration = configuration;
@@ -158,37 +182,16 @@ public class ChaosCommandExecutor
 	{
 		try
 		{
-			// Build the chaos monkey agent instructions inline to avoid requiring the agent file in destination repos
-			var chaosMonkeyInstructions = @"
-You are the Chaos Monkey Agent for the St. Jude fundraiser. Your mission is to introduce controlled, entertaining chaos mutations to the codebase.
-
-## Implementation Guidelines
-
-### DO:
-- ✅ Keep mutations entertaining but harmless
-- ✅ Preserve existing functionality - code should still compile and work
-- ✅ Add clear comments explaining what chaos was applied (include 🐒 emoji)
-- ✅ Use appropriate humor suitable for live streaming and charity fundraising
-- ✅ Target test files primarily for safer mutations
-- ✅ Make changes obvious so streamers can easily spot them
-- ✅ Test that code compiles after changes
-
-### DON'T:
-- ❌ Break the build or cause compilation errors
-- ❌ Remove or break existing functionality
-- ❌ Use inappropriate language or offensive content
-- ❌ Modify critical production code paths
-- ❌ Change database connections or external API calls
-- ❌ Alter security-related code
-";
-
 			// Combine the agent instructions with the specific task command
-			var fullPrompt = $"{chaosMonkeyInstructions}\n\n{task.Command}";
+			var fullPrompt = $"{ChaosMonkeyInstructions}\n\n{task.Command}";
+			
+			// Escape double quotes in the prompt to prevent command line parsing issues
+			var escapedPrompt = fullPrompt.Replace("\"", "\\\"");
 			
 			// Use the copilot CLI in programmatic mode with automatic approval for shell commands
 			// Note: Using --allow-all-tools allows Copilot to execute shell commands
 			// For safety in production, you may want to use more restrictive options
-			var promptCommand = $"-p \"{fullPrompt}\" --allow-all-paths --allow-all-tools -s";
+			var promptCommand = $"-p \"{escapedPrompt}\" --allow-all-paths --allow-all-tools -s";
 
 			_logger.LogInformation("Invoking Copilot CLI for: {Description}", task.Description);
 
