@@ -56,56 +56,56 @@ public class ChaosExecutorService : BackgroundService
 	{
 		// Create a scope to resolve scoped services
 		using var scope = _serviceProvider.CreateScope();
-		var githubService = scope.ServiceProvider.GetRequiredService<GitHubService>();
+		var jsonQueueService = scope.ServiceProvider.GetRequiredService<JsonQueueService>();
 		var commandExecutor = scope.ServiceProvider.GetRequiredService<ChaosCommandExecutor>();
 
-		var chaosIssues = await githubService.GetUnprocessedChaosIssuesAsync();
+		var queueItems = await jsonQueueService.GetPendingItemsAsync();
 
-		if (chaosIssues.Count == 0)
+		if (queueItems.Count == 0)
 		{
-			_logger.LogDebug("No unprocessed chaos issues found");
+			_logger.LogDebug("No pending queue items found");
 			return;
 		}
 
-		_logger.LogInformation("Found {Count} unprocessed chaos issue(s)", chaosIssues.Count);
+		_logger.LogInformation("Found {Count} pending queue item(s)", queueItems.Count);
 
-		foreach (var issue in chaosIssues)
+		foreach (var queueItem in queueItems)
 		{
 			if (cancellationToken.IsCancellationRequested)
 				break;
 
 			try
 			{
-				_logger.LogInformation("Processing chaos issue #{Number}: {Title}", issue.Number, issue.Title);
+				_logger.LogInformation("Processing queue item {Id}: {Description}", queueItem.Id, queueItem.Description);
 
-				// Mark issue as being processed (add a label or comment)
-				await githubService.MarkIssueAsProcessingAsync(issue.Number);
+				// Mark item as being processed
+				await jsonQueueService.MarkAsProcessingAsync(queueItem.Id);
 
 				// Notify overlay that chaos is starting
-				await _hubContext.Clients.All.SendAsync("ChaosStarted", issue.Number, issue.Title, cancellationToken);
+				await _hubContext.Clients.All.SendAsync("ChaosStarted", queueItem.Id, queueItem.Description, cancellationToken);
 
 				// Execute the chaos command
-				var result = await commandExecutor.ExecuteChaosTaskAsync(issue);
+				var result = await commandExecutor.ExecuteChaosTaskAsync(queueItem);
 
 				if (result.Success)
 				{
-					_logger.LogInformation("Successfully executed chaos task for issue #{Number}", issue.Number);
-					await githubService.MarkIssueAsCompletedAsync(issue.Number, result.Output);
-					await _hubContext.Clients.All.SendAsync("ChaosCompleted", issue.Number, true, cancellationToken);
+					_logger.LogInformation("Successfully executed chaos task for queue item {Id}", queueItem.Id);
+					await jsonQueueService.MarkAsCompletedAsync(queueItem.Id, result.Output);
+					await _hubContext.Clients.All.SendAsync("ChaosCompleted", queueItem.Id, true, cancellationToken);
 				}
 				else
 				{
-					_logger.LogError("Failed to execute chaos task for issue #{Number}: {Error}", 
-						issue.Number, result.Error);
-					await githubService.MarkIssueAsFailedAsync(issue.Number, result.Error);
-					await _hubContext.Clients.All.SendAsync("ChaosCompleted", issue.Number, false, cancellationToken);
+					_logger.LogError("Failed to execute chaos task for queue item {Id}: {Error}", 
+						queueItem.Id, result.Error);
+					await jsonQueueService.MarkAsFailedAsync(queueItem.Id, result.Error);
+					await _hubContext.Clients.All.SendAsync("ChaosCompleted", queueItem.Id, false, cancellationToken);
 				}
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "Error processing chaos issue #{Number}", issue.Number);
-				await githubService.MarkIssueAsFailedAsync(issue.Number, ex.Message);
-				await _hubContext.Clients.All.SendAsync("ChaosCompleted", issue.Number, false, cancellationToken);
+				_logger.LogError(ex, "Error processing queue item {Id}", queueItem.Id);
+				await jsonQueueService.MarkAsFailedAsync(queueItem.Id, ex.Message);
+				await _hubContext.Clients.All.SendAsync("ChaosCompleted", queueItem.Id, false, cancellationToken);
 			}
 		}
 	}

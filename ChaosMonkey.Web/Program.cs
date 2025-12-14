@@ -9,6 +9,7 @@ builder.AddServiceDefaults();
 // Add services
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<GitHubService>();
+builder.Services.AddSingleton<JsonQueueService>();
 builder.Services.AddSingleton<ChaosCommandExecutor>();
 builder.Services.AddHostedService<ChaosExecutorService>();
 
@@ -24,6 +25,9 @@ app.UseStaticFiles();
 // Map webhook endpoints
 app.MapTiltifyEndpoints();
 
+// Map queue endpoints
+app.MapQueueEndpoints();
+
 // Map SignalR hub
 app.MapHub<ChaosStatusHub>("/hubs/chaos");
 
@@ -33,7 +37,7 @@ app.MapDefaultEndpoints();
 app.MapGet("/", () => new { 
     Service = "Chaos Monkey Web API", 
     Status = "Running",
-    Endpoints = new[] { "/webhooks/tiltify", "/webhooks/tiltify/health" }
+    Endpoints = new[] { "/webhooks/tiltify", "/webhooks/tiltify/health", "/queue/status" }
 }).WithName("Root").WithTags("Info");
 
 app.Run();
