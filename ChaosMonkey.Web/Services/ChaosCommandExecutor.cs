@@ -184,27 +184,50 @@ You are the Chaos Monkey Agent for the St. Jude fundraiser. Your mission is to i
 		{
 			// Combine the agent instructions with the specific task command
 			var fullPrompt = $"{ChaosMonkeyInstructions}\n\n{task.Command}";
-			
-			// Escape double quotes in the prompt to prevent command line parsing issues
-			var escapedPrompt = fullPrompt.Replace("\"", "\\\"");
-			
-			// Use the copilot CLI in programmatic mode with automatic approval for shell commands
-			// Note: Using --allow-all-tools allows Copilot to execute shell commands
-			// For safety in production, you may want to use more restrictive options
-			var promptCommand = $"-p \"{escapedPrompt}\" --allow-all-paths --allow-all-tools -s";
 
 			_logger.LogInformation("Invoking Copilot CLI for: {Description}", task.Description);
 
-			var result = await ExecutePowerShellCommandAsync(promptCommand, workingDirectory);
-
-			if (!result.Success)
+			// Use ProcessStartInfo.ArgumentList for safer argument handling (no manual escaping needed)
+			var processInfo = new ProcessStartInfo
 			{
-				return ChaosExecutionResult.Failed($"Failed to execute with Copilot CLI: {result.Error}");
+				FileName = "copilot",
+				WorkingDirectory = workingDirectory,
+				RedirectStandardOutput = true,
+				RedirectStandardError = true,
+				UseShellExecute = false,
+				CreateNoWindow = true
+			};
+
+			// Add arguments using ArgumentList for automatic and safe escaping
+			processInfo.ArgumentList.Add("-p");
+			processInfo.ArgumentList.Add(fullPrompt);
+			processInfo.ArgumentList.Add("--allow-all-paths");
+			processInfo.ArgumentList.Add("--allow-all-tools");
+			processInfo.ArgumentList.Add("-s");
+
+			_logger.LogInformation("Executing Copilot CLI in {WorkingDirectory}", workingDirectory);
+
+			using var process = Process.Start(processInfo);
+			if (process == null)
+			{
+				return ChaosExecutionResult.Failed("Failed to start Copilot process");
+			}
+
+			var output = await process.StandardOutput.ReadToEndAsync();
+			var error = await process.StandardError.ReadToEndAsync();
+
+			await process.WaitForExitAsync();
+
+			if (process.ExitCode != 0)
+			{
+				_logger.LogError("Copilot output: {Output}", output);
+				_logger.LogError("Copilot error: {Error}", error);
+				return ChaosExecutionResult.Failed($"Command failed with exit code {process.ExitCode}\n{error}");
 			}
 
 			_logger.LogInformation("Copilot CLI completed task: {Description}", task.Description);
 
-			return ChaosExecutionResult.Succeeded(result.Output);
+			return ChaosExecutionResult.Succeeded(output);
 		}
 		catch (Exception ex)
 		{
