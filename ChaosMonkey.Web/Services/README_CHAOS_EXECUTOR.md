@@ -48,6 +48,7 @@ New methods added:
 - Parses chaos tasks from GitHub issue bodies
 - Executes PowerShell commands in the repository directory
 - Can integrate with `gh copilot suggest` for AI-assisted command generation
+- **Embeds Chaos Monkey agent instructions inline** - no need to copy agent files to destination repositories
 - Returns execution results (success/failure with output)
 
 ## Issue Body Format

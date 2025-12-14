@@ -9,6 +9,30 @@ public class ChaosCommandExecutor
 	private readonly IConfiguration _configuration;
 	private readonly ILogger<ChaosCommandExecutor> _logger;
 
+	// Chaos Monkey agent instructions embedded inline to avoid requiring agent files in destination repos
+	private const string ChaosMonkeyInstructions = @"
+You are the Chaos Monkey Agent for the St. Jude fundraiser. Your mission is to introduce controlled, entertaining chaos mutations to the codebase.
+
+## Implementation Guidelines
+
+### DO:
+- ✅ Keep mutations entertaining but harmless
+- ✅ Preserve existing functionality - code should still compile and work
+- ✅ Add clear comments explaining what chaos was applied (include 🐒 emoji)
+- ✅ Use appropriate humor suitable for live streaming and charity fundraising
+- ✅ Target test files primarily for safer mutations
+- ✅ Make changes obvious so streamers can easily spot them
+- ✅ Test that code compiles after changes
+
+### DON'T:
+- ❌ Break the build or cause compilation errors
+- ❌ Remove or break existing functionality
+- ❌ Use inappropriate language or offensive content
+- ❌ Modify critical production code paths
+- ❌ Change database connections or external API calls
+- ❌ Alter security-related code
+";
+
 	public ChaosCommandExecutor(IConfiguration configuration, ILogger<ChaosCommandExecutor> logger)
 	{
 		_configuration = configuration;
@@ -99,24 +123,23 @@ public class ChaosCommandExecutor
 			return ChaosExecutionResult.Failed($"Repository path not configured or does not exist: {repoPath}");
 		}
 
-		// If a specific command is provided, execute it
-		// if (!string.IsNullOrWhiteSpace(task.Command))
-		// {
-		// 	return await ExecutePowerShellCommandAsync(task.Command, repoPath);
-		// }
-
-		// Otherwise, use gh copilot CLI to suggest and execute
+		// Use gh copilot CLI to suggest and execute
 		return await ExecuteWithCopilotCLIAsync(task, repoPath);
 	}
 
-	private async Task<ChaosExecutionResult> ExecutePowerShellCommandAsync(string command, string workingDirectory)
+	private async Task<ChaosExecutionResult> ExecuteWithCopilotCLIAsync(ChaosTask task, string workingDirectory)
 	{
 		try
 		{
+			// Combine the agent instructions with the specific task command
+			var fullPrompt = $"{ChaosMonkeyInstructions}\n\n{task.Command}";
+
+			_logger.LogInformation("Invoking Copilot CLI for: {Description}", task.Description);
+
+			// Use ProcessStartInfo.ArgumentList for safer argument handling (no manual escaping needed)
 			var processInfo = new ProcessStartInfo
 			{
 				FileName = "copilot",
-				Arguments = command,
 				WorkingDirectory = workingDirectory,
 				RedirectStandardOutput = true,
 				RedirectStandardError = true,
@@ -124,13 +147,19 @@ public class ChaosCommandExecutor
 				CreateNoWindow = true
 			};
 
-			// log the command being executed
-			_logger.LogInformation("Executing PowerShell command: {Command} in {WorkingDirectory}", command, workingDirectory);
+			// Add arguments using ArgumentList for automatic and safe escaping
+			processInfo.ArgumentList.Add("-p");
+			processInfo.ArgumentList.Add(fullPrompt);
+			processInfo.ArgumentList.Add("--allow-all-paths");
+			processInfo.ArgumentList.Add("--allow-all-tools");
+			processInfo.ArgumentList.Add("-s");
+
+			_logger.LogInformation("Executing Copilot CLI in {WorkingDirectory}", workingDirectory);
 
 			using var process = Process.Start(processInfo);
 			if (process == null)
 			{
-				return ChaosExecutionResult.Failed("Failed to start PowerShell process");
+				return ChaosExecutionResult.Failed("Failed to start Copilot process");
 			}
 
 			var output = await process.StandardOutput.ReadToEndAsync();
@@ -140,41 +169,14 @@ public class ChaosCommandExecutor
 
 			if (process.ExitCode != 0)
 			{
-				_logger.LogError("Powershell output: {Output}", output);
-				_logger.LogError("Powershell error: {Error}", error);
+				_logger.LogError("Copilot output: {Output}", output);
+				_logger.LogError("Copilot error: {Error}", error);
 				return ChaosExecutionResult.Failed($"Command failed with exit code {process.ExitCode}\n{error}");
-			}
-
-			return ChaosExecutionResult.Succeeded(output);
-		}
-		catch (Exception ex)
-		{
-			_logger.LogError(ex, "Failed to execute PowerShell command: {Command}", command);
-			return ChaosExecutionResult.Failed(ex.Message);
-		}
-	}
-
-	private async Task<ChaosExecutionResult> ExecuteWithCopilotCLIAsync(ChaosTask task, string workingDirectory)
-	{
-		try
-		{
-			// Use the new copilot CLI in programmatic mode with automatic approval for shell commands
-			// Note: Using --allow-tool 'shell' allows Copilot to execute shell commands
-			// For safety in production, you may want to use more restrictive options
-			var promptCommand = $"-p \"{task.Command}\" --agent chaos-monkey --allow-all-paths --allow-all-tools -s";
-
-			_logger.LogInformation("Invoking Copilot CLI for: {Description}", task.Description);
-
-			var result = await ExecutePowerShellCommandAsync(promptCommand, workingDirectory);
-
-			if (!result.Success)
-			{
-				return ChaosExecutionResult.Failed($"Failed to execute with Copilot CLI: {result.Error}");
 			}
 
 			_logger.LogInformation("Copilot CLI completed task: {Description}", task.Description);
 
-			return ChaosExecutionResult.Succeeded(result.Output);
+			return ChaosExecutionResult.Succeeded(output);
 		}
 		catch (Exception ex)
 		{
