@@ -123,59 +123,8 @@ You are the Chaos Monkey Agent for the St. Jude fundraiser. Your mission is to i
 			return ChaosExecutionResult.Failed($"Repository path not configured or does not exist: {repoPath}");
 		}
 
-		// If a specific command is provided, execute it
-		// if (!string.IsNullOrWhiteSpace(task.Command))
-		// {
-		// 	return await ExecutePowerShellCommandAsync(task.Command, repoPath);
-		// }
-
-		// Otherwise, use gh copilot CLI to suggest and execute
+		// Use gh copilot CLI to suggest and execute
 		return await ExecuteWithCopilotCLIAsync(task, repoPath);
-	}
-
-	private async Task<ChaosExecutionResult> ExecutePowerShellCommandAsync(string command, string workingDirectory)
-	{
-		try
-		{
-			var processInfo = new ProcessStartInfo
-			{
-				FileName = "copilot",
-				Arguments = command,
-				WorkingDirectory = workingDirectory,
-				RedirectStandardOutput = true,
-				RedirectStandardError = true,
-				UseShellExecute = false,
-				CreateNoWindow = true
-			};
-
-			// log the command being executed
-			_logger.LogInformation("Executing PowerShell command: {Command} in {WorkingDirectory}", command, workingDirectory);
-
-			using var process = Process.Start(processInfo);
-			if (process == null)
-			{
-				return ChaosExecutionResult.Failed("Failed to start PowerShell process");
-			}
-
-			var output = await process.StandardOutput.ReadToEndAsync();
-			var error = await process.StandardError.ReadToEndAsync();
-
-			await process.WaitForExitAsync();
-
-			if (process.ExitCode != 0)
-			{
-				_logger.LogError("Powershell output: {Output}", output);
-				_logger.LogError("Powershell error: {Error}", error);
-				return ChaosExecutionResult.Failed($"Command failed with exit code {process.ExitCode}\n{error}");
-			}
-
-			return ChaosExecutionResult.Succeeded(output);
-		}
-		catch (Exception ex)
-		{
-			_logger.LogError(ex, "Failed to execute PowerShell command: {Command}", command);
-			return ChaosExecutionResult.Failed(ex.Message);
-		}
 	}
 
 	private async Task<ChaosExecutionResult> ExecuteWithCopilotCLIAsync(ChaosTask task, string workingDirectory)
