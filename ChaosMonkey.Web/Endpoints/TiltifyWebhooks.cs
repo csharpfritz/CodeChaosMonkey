@@ -25,6 +25,7 @@ public static class TiltifyWebhooks
         [FromBody] TiltifyWebhookPayload payload,
         [FromServices] IConfiguration configuration,
         GitHubService gitHubService,
+        JsonQueueService jsonQueueService,
         ILogger<Program> logger)
     {
         try
@@ -62,16 +63,17 @@ public static class TiltifyWebhooks
             // 	return Results.Ok(new WebhookResponse(true, $"Ignored donation amount: {donationAmountValue}"));
             // }
 
-            // Create GitHub issue for the chaos request
+            // Add to JSON queue for processing
             logger.LogInformation($"Payload: {System.Text.Json.JsonSerializer.Serialize(payload.Data)}");
-            var issueUrl = await gitHubService.CreateChaosIssueAsync(payload.Data);
+            
+            var queueItemId = await jsonQueueService.AddToQueueAsync(payload.Data);
 
-            if (issueUrl != null)
+            if (!string.IsNullOrEmpty(queueItemId))
             {
                 var response = new WebhookResponse(
                     true,
-                    "Successfully created chaos issue",
-                    issueUrl
+                    "Successfully added to chaos queue",
+                    queueItemId
                 );
 
                 var amount = decimal.Parse(payload.Data.Amount.Value);
@@ -82,9 +84,9 @@ public static class TiltifyWebhooks
             }
             else
             {
-                logger.LogWarning("Failed to create GitHub issue for donation {DonationId}", payload.Data.Id);
+                logger.LogWarning("Failed to add donation {DonationId} to queue", payload.Data.Id);
                 return Results.Json(
-                    new WebhookResponse(false, "Failed to create GitHub issue"),
+                    new WebhookResponse(false, "Failed to add to queue"),
                     statusCode: 500
                 );
             }

@@ -9,6 +9,7 @@ builder.AddServiceDefaults();
 // Add services
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<GitHubService>();
+builder.Services.AddSingleton<JsonQueueService>();
 builder.Services.AddSingleton<ChaosCommandExecutor>();
 builder.Services.AddHostedService<ChaosExecutorService>();
 

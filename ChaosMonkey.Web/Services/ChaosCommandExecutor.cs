@@ -1,6 +1,7 @@
 using Octokit;
 using System.Diagnostics;
 using System.Text;
+using ChaosMonkey.Web.Models;
 
 namespace ChaosMonkey.Web.Services;
 
@@ -13,6 +14,32 @@ public class ChaosCommandExecutor
 	{
 		_configuration = configuration;
 		_logger = logger;
+	}
+
+	public async Task<ChaosExecutionResult> ExecuteChaosTaskAsync(ChaosQueueItem queueItem)
+	{
+		try
+		{
+			// Convert queue item to chaos task
+			var chaosTask = new ChaosTask
+			{
+				Type = queueItem.ChaosType,
+				Description = queueItem.Description,
+				RequestedBy = queueItem.DonorName
+			};
+
+			_logger.LogInformation("Executing chaos task: {Task}", chaosTask.Description);
+
+			// Execute the command based on the task type
+			var result = await ExecuteCommandAsync(chaosTask);
+
+			return result;
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Failed to execute chaos task for queue item {Id}", queueItem.Id);
+			return ChaosExecutionResult.Failed(ex.Message);
+		}
 	}
 
 	public async Task<ChaosExecutionResult> ExecuteChaosTaskAsync(Issue issue)
